@@ -159,8 +159,9 @@ def health() -> dict[str, str]:
 
 
 @app.post("/reset", response_model=TransitionResponse)
-def reset_environment(request: ResetRequest) -> TransitionResponse:
-    observation = store.reset(request.task_id, _ensure_llm_proxy_called())
+def reset_environment(request: ResetRequest | None = None) -> TransitionResponse:
+    task_id = request.task_id if request is not None else "easy"
+    observation = store.reset(task_id, _ensure_llm_proxy_called())
     return TransitionResponse(
         observation=observation,
         reward=0.0,
