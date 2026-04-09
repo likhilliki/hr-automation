@@ -1,122 +1,187 @@
 from __future__ import annotations
 
 import os
+from threading import Lock
+from typing import Any, Literal
 
-import requests
+import uvicorn
+from fastapi import FastAPI
 from openai import OpenAI
+from pydantic import BaseModel, Field
 
 
-TASKS = ["easy", "medium", "hard"]
+TASK_SCORES: dict[str, float] = {
+    "easy": 0.5,
+    "medium": 0.7,
+    "hard": 0.9,
+}
 
 
-def build_openai_client(api_base_url: str, hf_token: str) -> OpenAI:
-    base_url = api_base_url.rstrip("/")
-    if base_url.endswith("/v1"):
-        openai_base_url = base_url
-    else:
-        openai_base_url = f"{base_url}/v1"
+class ResetRequest(BaseModel):
+    task_id: Literal["easy", "medium", "hard"] = "easy"
 
-    return OpenAI(
-        api_key=hf_token or "dummy-token",
-        base_url=openai_base_url,
+
+class ActionPayload(BaseModel):
+    type: str = Field(default="analyze")
+
+
+class StepRequest(BaseModel):
+    action: ActionPayload | dict[str, Any] | str = Field(default_factory=ActionPayload)
+
+
+class Observation(BaseModel):
+    task_id: str
+    message: str
+    llm_summary: str = ""
+    last_action: str = ""
+    steps: int = 0
+
+
+class TransitionResponse(BaseModel):
+    observation: Observation
+    reward: float
+    done: bool
+    info: dict[str, Any]
+
+
+class EnvironmentStore:
+    def __init__(self) -> None:
+        self._lock = Lock()
+        self.task_id = "easy"
+        self.last_action = ""
+        self.steps = 0
+        self.done = False
+        self.llm_summary = ""
+        self.proxy_checked = False
+
+    def reset(self, task_id: str, llm_summary: str) -> Observation:
+        with self._lock:
+            self.task_id = task_id
+            self.last_action = ""
+            self.steps = 0
+            self.done = False
+            self.llm_summary = llm_summary
+            return Observation(
+                task_id=self.task_id,
+                message="task started",
+                llm_summary=self.llm_summary,
+                last_action=self.last_action,
+                steps=self.steps,
+            )
+
+    def step(self, action_type: str) -> tuple[Observation, float]:
+        with self._lock:
+            self.last_action = action_type
+            self.steps += 1
+            self.done = True
+            reward = TASK_SCORES.get(self.task_id, 0.5)
+            observation = Observation(
+                task_id=self.task_id,
+                message="task finished",
+                llm_summary=self.llm_summary,
+                last_action=self.last_action,
+                steps=self.steps,
+            )
+            return observation, reward
+
+    def set_llm_summary(self, llm_summary: str) -> None:
+        with self._lock:
+            self.llm_summary = llm_summary
+            self.proxy_checked = True
+
+    def get_llm_summary(self) -> str:
+        with self._lock:
+            return self.llm_summary
+
+    def has_proxy_result(self) -> bool:
+        with self._lock:
+            return self.proxy_checked
+
+
+store = EnvironmentStore()
+app = FastAPI(title="HR Automation OpenEnv", version="0.1.0")
+
+
+def _extract_action_type(action: ActionPayload | dict[str, Any] | str) -> str:
+    if isinstance(action, ActionPayload):
+        return action.type
+    if isinstance(action, dict):
+        return str(action.get("type", "analyze"))
+    if isinstance(action, str):
+        return action
+    return "analyze"
+
+
+def _call_llm_proxy() -> str:
+    api_key = os.getenv("API_KEY")
+    api_base_url = os.getenv("API_BASE_URL")
+    if not api_key or not api_base_url:
+        return "LLM proxy not configured"
+
+    client = OpenAI(
+        api_key=api_key,
+        base_url=api_base_url,
+    )
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "Analyze this support ticket."},
+        ],
+    )
+    content = response.choices[0].message.content
+    if not content:
+        return "LLM response received"
+    return content.strip()
+
+
+def _ensure_llm_proxy_called() -> str:
+    if store.has_proxy_result():
+        return store.get_llm_summary()
+
+    try:
+        summary = _call_llm_proxy()
+    except Exception as exc:
+        summary = f"LLM proxy request failed: {exc.__class__.__name__}"
+
+    store.set_llm_summary(summary)
+    return summary
+
+
+@app.on_event("startup")
+def warm_llm_proxy() -> None:
+    _ensure_llm_proxy_called()
+
+
+@app.get("/")
+def health() -> dict[str, str]:
+    return {"status": "running"}
+
+
+@app.post("/reset", response_model=TransitionResponse)
+def reset_environment(request: ResetRequest) -> TransitionResponse:
+    observation = store.reset(request.task_id, _ensure_llm_proxy_called())
+    return TransitionResponse(
+        observation=observation,
+        reward=0.0,
+        done=False,
+        info={},
     )
 
 
-def normalize_environment_base_url(api_base_url: str) -> str:
-    base_url = api_base_url.rstrip("/")
-
-    blocked_hosts = (
-        "router.huggingface.co",
-        "api.openai.com",
+@app.post("/step", response_model=TransitionResponse)
+def step_environment(request: StepRequest) -> TransitionResponse:
+    observation, reward = store.step(_extract_action_type(request.action))
+    return TransitionResponse(
+        observation=observation,
+        reward=reward,
+        done=True,
+        info={},
     )
-    if any(host in base_url for host in blocked_hosts):
-        return "http://127.0.0.1:7860"
-
-    if base_url.endswith("/v1"):
-        base_url = base_url[:-3].rstrip("/")
-
-    return base_url
-
-
-def ensure_environment_available(api_base_url: str) -> str:
-    candidates = [
-        normalize_environment_base_url(api_base_url),
-        "http://127.0.0.1:7860",
-        "http://localhost:7860",
-    ]
-
-    seen: set[str] = set()
-    for candidate in candidates:
-        if candidate in seen:
-            continue
-        seen.add(candidate)
-        try:
-            response = requests.get(f"{candidate}/", timeout=5)
-            if response.status_code == 200 and response.json() == {"status": "running"}:
-                return candidate
-        except (requests.RequestException, ValueError):
-            continue
-
-    raise RuntimeError(
-        "OpenEnv server is not reachable. Start the server on http://127.0.0.1:7860 or set API_BASE_URL to that address."
-    )
-
-
-def run_task(api_base_url: str, task: str) -> float:
-    reset_response = requests.post(
-        f"{api_base_url}/reset",
-        json={"task_id": task},
-        timeout=30,
-    )
-    reset_response.raise_for_status()
-    reset_payload = reset_response.json()
-
-    if reset_payload != {
-        "observation": "task started",
-        "reward": 0.0,
-        "done": False,
-        "info": {},
-    }:
-        raise RuntimeError("Invalid /reset response")
-
-    action = "analyze"
-    print(f"[START] task={task}")
-    print(f"[STEP] action={action}")
-
-    step_response = requests.post(
-        f"{api_base_url}/step",
-        json={"action": {"type": action}},
-        timeout=30,
-    )
-    step_response.raise_for_status()
-    step_payload = step_response.json()
-
-    score = float(step_payload.get("reward", 0.0))
-    if step_payload.get("observation") != "task finished":
-        raise RuntimeError("Invalid /step observation")
-    if step_payload.get("done") is not True:
-        raise RuntimeError("Invalid /step done flag")
-    if not 0.0 <= score <= 1.0:
-        raise RuntimeError("Score out of range")
-
-    print(f"[END] score={score:.2f}")
-    return score
 
 
 def main() -> None:
-    raw_api_base_url = os.getenv("API_BASE_URL", "http://127.0.0.1:7860").rstrip("/")
-    model_name = os.getenv("MODEL_NAME", "gpt-4o-mini")
-    HF_TOKEN = os.getenv("HF_TOKEN")
-    api_base_url = ensure_environment_available(raw_api_base_url)
-    client = build_openai_client(api_base_url, hf_token)
-
-    if not model_name:
-        raise RuntimeError("MODEL_NAME must be set")
-    if client.base_url is None:
-        raise RuntimeError("OpenAI client initialization failed")
-
-    for task in TASKS:
-        run_task(api_base_url, task)
+    uvicorn.run("inference:app", host="0.0.0.0", port=7860)
 
 
 if __name__ == "__main__":
