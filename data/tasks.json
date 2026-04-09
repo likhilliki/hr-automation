@@ -1,0 +1,23 @@
+[
+  {
+    "id": "easy",
+    "name": "Easy candidate screening",
+    "description": "Single candidate CV; extract skills and score candidate.",
+    "job_id": "software_engineer",
+    "candidate_ids": ["alice_jones"]
+  },
+  {
+    "id": "medium",
+    "name": "Medium match and shortlist",
+    "description": "Match candidate against job description and decide shortlist.",
+    "job_id": "data_analyst",
+    "candidate_ids": ["brandon_lee"]
+  },
+  {
+    "id": "hard",
+    "name": "Hard ranking of multiple candidates",
+    "description": "Evaluate multiple candidates and choose the best candidate.",
+    "job_id": "product_manager",
+    "candidate_ids": ["carla_nguyen", "daniel_kim", "emily_chen"]
+  }
+]

@@ -1,0 +1,23 @@
+[
+  {
+    "id": "software_engineer",
+    "title": "Software Engineer",
+    "required_skills": ["python", "api development", "unit testing", "cloud"],
+    "experience_required": 2,
+    "description": "Build and maintain backend services, APIs, and automated tests in a cloud environment."
+  },
+  {
+    "id": "data_analyst",
+    "title": "Data Analyst",
+    "required_skills": ["sql", "data visualization", "python", "dashboarding"],
+    "experience_required": 1,
+    "description": "Analyze data, create dashboards, and communicate insights to business stakeholders."
+  },
+  {
+    "id": "product_manager",
+    "title": "Product Manager",
+    "required_skills": ["roadmapping", "stakeholder management", "user research", "analytics"],
+    "experience_required": 4,
+    "description": "Drive product strategy, coordinate stakeholders, and lead user-centered product discovery."
+  }
+]

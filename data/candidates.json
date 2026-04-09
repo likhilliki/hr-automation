@@ -1,0 +1,42 @@
+[
+  {
+    "id": "alice_jones",
+    "name": "Alice Jones",
+    "skills": ["python", "api development", "unit testing", "cloud"],
+    "experience": 3,
+    "education": "B.Sc. Computer Science",
+    "cv_text": "Experienced backend engineer with strong Python skills, API development experience, and expertise in automated testing and cloud deployment."
+  },
+  {
+    "id": "brandon_lee",
+    "name": "Brandon Lee",
+    "skills": ["sql", "data visualization", "dashboarding", "python"],
+    "experience": 2,
+    "education": "B.A. Economics",
+    "cv_text": "Data analyst with SQL and dashboard experience, delivering business insights through visualization and reporting."
+  },
+  {
+    "id": "carla_nguyen",
+    "name": "Carla Nguyen",
+    "skills": ["roadmapping", "stakeholder management", "analytics", "user research"],
+    "experience": 5,
+    "education": "MBA",
+    "cv_text": "Product leader skilled in roadmapping, stakeholder alignment, user research, and analytics for customer-focused solutions."
+  },
+  {
+    "id": "daniel_kim",
+    "name": "Daniel Kim",
+    "skills": ["roadmapping", "analytics", "technical documentation"],
+    "experience": 4,
+    "education": "B.S. Business Administration",
+    "cv_text": "Business analyst with product planning experience, analytics skills, and strong technical documentation capabilities."
+  },
+  {
+    "id": "emily_chen",
+    "name": "Emily Chen",
+    "skills": ["python", "sql", "data visualization", "dashboarding", "analytics"],
+    "experience": 3,
+    "education": "M.S. Data Science",
+    "cv_text": "Data science professional with Python, SQL, and visualization expertise, focused on delivering data-driven insights."
+  }
+]
