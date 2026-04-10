@@ -5,5 +5,5 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 COPY . .
-RUN pip install fastapi uvicorn openai openenv
+RUN pip install fastapi uvicorn openai openenv requests
 CMD ["uvicorn","inference:app","--host","0.0.0.0","--port","7860"]
