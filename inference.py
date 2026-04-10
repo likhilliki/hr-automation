@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import requests
 import os
 from threading import Lock
 from typing import Any, Literal
@@ -183,36 +184,38 @@ def step_environment(request: StepRequest) -> TransitionResponse:
     )
 
 
-def main() -> None:
+def run_task(task: str):
     API_BASE_URL = os.getenv("API_BASE_URL")
 
+    # START
+    print(f"[START] task={task}", flush=True)
+
+    # RESET
+    requests.post(
+        f"{API_BASE_URL}/reset",
+        json={"task_id": task}
+    ).json()
+
+    # STEP
+    step_res = requests.post(
+        f"{API_BASE_URL}/step",
+        json={"action": {"type": "analyze"}}
+    ).json()
+
+    reward = step_res.get("reward", 0.0)
+    steps = step_res.get("observation", {}).get("steps", 1)
+
+    # STEP
+    print(f"[STEP] step=1 reward={reward}", flush=True)
+
+    # END
+    print(f"[END] task={task} score={reward} steps={steps}", flush=True)
+
+
+def main() -> None:
     try:
-        task = "easy"
-
-        # START block
-        print(f"[START] task={task}", flush=True)
-
-        # RESET
-        reset_res = requests.post(
-            f"{API_BASE_URL}/reset",
-            json={"task_id": task}
-        ).json()
-
-        # STEP
-        step_res = requests.post(
-            f"{API_BASE_URL}/step",
-            json={"action": {"type": "analyze"}}
-        ).json()
-
-        reward = step_res.get("reward", 0.0)
-        steps = step_res.get("observation", {}).get("steps", 1)
-
-        # STEP block
-        print(f"[STEP] step=1 reward={reward}", flush=True)
-
-        # END block
-        print(f"[END] task={task} score={reward} steps={steps}", flush=True)
-
+        for task in ["easy", "medium", "hard"]:
+            run_task(task)
     except Exception as e:
         print(f"[ERROR] {str(e)}", flush=True)
 
