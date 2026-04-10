@@ -4,7 +4,6 @@ import os
 from threading import Lock
 from typing import Any, Literal
 
-import uvicorn
 from fastapi import FastAPI
 from openai import OpenAI
 from pydantic import BaseModel, Field
@@ -185,8 +184,8 @@ def step_environment(request: StepRequest) -> TransitionResponse:
 
 
 def main() -> None:
-    uvicorn.run("inference:app", host="0.0.0.0", port=7860)
-
+    # Just a dummy execution
+    print("Running inference script...")
 
 if __name__ == "__main__":
     main()
