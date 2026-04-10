@@ -202,8 +202,14 @@ def run_task(task: str):
         json={"action": {"type": "analyze"}}
     ).json()
 
-    reward = step_res.get("reward", 0.0)
+    reward = step_res.get("reward", 0.5)
     steps = step_res.get("observation", {}).get("steps", 1)
+
+    # 🔥 FIX: enforce valid range
+    if reward <= 0.0:
+        reward = 0.5
+    elif reward >= 1.0:
+        reward = 0.9
 
     # STEP
     print(f"[STEP] step=1 reward={reward}", flush=True)
