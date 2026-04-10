@@ -184,8 +184,37 @@ def step_environment(request: StepRequest) -> TransitionResponse:
 
 
 def main() -> None:
-    # Just a dummy execution
-    print("Running inference script...")
+    API_BASE_URL = os.getenv("API_BASE_URL")
+
+    try:
+        task = "easy"
+
+        # START block
+        print(f"[START] task={task}", flush=True)
+
+        # RESET
+        reset_res = requests.post(
+            f"{API_BASE_URL}/reset",
+            json={"task_id": task}
+        ).json()
+
+        # STEP
+        step_res = requests.post(
+            f"{API_BASE_URL}/step",
+            json={"action": {"type": "analyze"}}
+        ).json()
+
+        reward = step_res.get("reward", 0.0)
+        steps = step_res.get("observation", {}).get("steps", 1)
+
+        # STEP block
+        print(f"[STEP] step=1 reward={reward}", flush=True)
+
+        # END block
+        print(f"[END] task={task} score={reward} steps={steps}", flush=True)
+
+    except Exception as e:
+        print(f"[ERROR] {str(e)}", flush=True)
 
 if __name__ == "__main__":
     main()
